@@ -278,3 +278,300 @@ CREATE TABLE car_model(
 ALTER TABLE rental_cars
 DROP COLUMN manufacturer,
 DROP COLUMN type_car;
+==============VIEWS=======================
+Exercise
+Viewing views
+Because views are very useful, it's common to end up with many of them in your database. It's important to keep track of them so that database users know what is available to them.
+
+The goal of this exercise is to get familiar with viewing views within a database and interpreting their purpose. This is a skill needed when writing database documentation or organizing views.
+
+Instructions
+Query the information schema to get views.
+Exclude system views in the results.
+-- Get all non-systems views
+SELECT * FROM information_schema.views
+WHERE table_schema NOT IN ('pg_catalog', 'information_schema');
+=========
+Creating and querying a view
+Create a view called high_scores that holds reviews with scores above a 9.
+-- Create a view for reviews with a score above 9
+CREATE VIEW high_scores AS
+SELECT * FROM reviews
+WHERE score > 9;
+
+--Count the number of records in high_scores that are self-released in the label --field of the labels table.
+-- Create a view for reviews with a score above 9
+CREATE VIEW high_scores AS
+SELECT * FROM REVIEWS
+WHERE score > 9;
+
+-- Count the number of self-released works in high_scores
+SELECT COUNT(*) FROM labels
+INNER JOIN high_scores ON high_scores.reviewid = labels.reviewid
+WHERE labels.label = 'self-released';
+--------------------------
+Exercise
+Creating a view from other views
+Views can be created from queries that include other views. This is useful when you have a complex schema, potentially due to normalization, because it helps reduce the JOINS needed. The biggest concern is keeping track of dependencies, specifically how any modifying or dropping of a view may affect other views.
+
+In the next few exercises, we'll continue using the Pitchfork reviews data. There are two views of interest in this exercise. top_15_2017 holds the top 15 highest scored reviews published in 2017 with columns reviewid,title, and score. artist_title returns a list of all reviewed titles and their respective artists with columns reviewid, title, and artist. From these views, we want to create a new view that gets the highest scoring artists of 2017.
+
+INSTRUCTIONS
+Create a view called top_artists_2017 with artist from artist_title.
+To only return the highest scoring artists of 2017, join the views top_15_2017 and artist_title on reviewid.
+Output top_artists_2017
+-- Create a view with the top artists in 2017
+CREATE VIEW top_artists_2017 AS
+-- with only one column holding the artist field
+SELECT r.artist FROM artist_title as r
+INNER JOIN top_15_2017 as t
+ON r.reviewid = t.reviewid;
+
+-- Output the new view
+SELECT * FROM top_artists_2017;
+==========
+Granting and revoking access
+Access control is a key aspect of database management. Not all database users have the same needs and goals, from analysts, clerks, data scientists, to data engineers. As a general rule of thumb, write access should never be the default and only be given when necessary.
+
+In the case of our Pitchfork reviews, we don't want all database users to be able to write into the long_reviews view. Instead, the editor should be the only user able to edit this view.
+Instructions
+
+Revoke all database users' update and insert privileges on the long_reviews view.
+Grant the editor user update and insert privileges on the long_reviews view.
+-- Revoke everyone's update and insert privileges
+REVOKE UPDATE, INSERT ON long_reviews FROM PUBLIC;
+
+-- Grant the editor update and insert privileges
+GRANT UPDATE, INSERT ON long_reviews TO editor;
+===Exercise====
+Updatable views
+In a previous exercise, we've used the information_schema.views to get all the views in a database. If you take a closer look at this table, you will notice a column that indicates whether the view is updatable.
+
+Which views are updatable?
+SELECT table_name From information_schema.views
+WHERE table_schema NOT IN ('pg_catalog','information_schema') AND Is_updatable =  'YES'
+Check table name with running this query and see which views are updatable.
+Answer: long_reviews
+
+==========
+Redefining a view
+Unlike inserting and updating, redefining a view doesn't mean modifying the actual data a view holds. Rather, it means modifying the underlying query that makes the view. In the last video, we learned of two ways to redefine a view: (1) CREATE OR REPLACE and (2) DROP then CREATE. CREATE OR REPLACE can only be used under certain conditions.
+
+The artist_title view needs to be appended to include a column for the label field from the labels table.
+
+Question
+Can the CREATE OR REPLACE statement be used to redefine the artist_title view?
+
+Possible answers
+Yes, as long as the label column comes at the end.
+No, because the new query requires a JOIN with the labels table.
+No, because a new column that did not exist previously is being added to the view.
+Yes, as long as the label column has the same data type as the other columns in artist_title
+
+ANSWER:Yes, as long as the label column comes at the end.
+
+INSTRUCTIONS
+Use CREATE OR REPLACE to redefine the artist_title view.
+Respecting artist_title's original columns of reviewid, title, and artist, add a label column from the labels table.
+Join the labels table using the reviewid field
+
+-- Redefine the artist_title view to have a label column
+CREATE OR REPLACE VIEW artist_title AS
+SELECT reviews.reviewid, reviews.title, artists.artist, labels.label
+FROM reviews
+INNER JOIN artists
+ON artists.reviewid = reviews.reviewid
+INNER JOIN labels
+ON labels.reviewid = reviews.reviewid;
+
+SELECT * FROM artist_title;
+==========QUIZ=========
+![alt text](<Materialized and Non Materialized views.png>)
+===========================
+
+Exercise
+Creating and refreshing a materialized view
+The syntax for creating materialized and non-materialized views are quite similar because they are both defined by a query. One key difference is that we can refresh materialized views, while no such concept exists for non-materialized views. It's important to know how to refresh a materialized view, otherwise the view will remain a snapshot of the time the view was created.
+
+In this exercise, you will create a materialized view from the table genres. A new record will then be inserted into genres. To make sure the view has the latest data, it will have to be refreshed.
+INSTRUCTIONS
+Create a materialized view called genre_count that holds the number of reviews for each genre.
+Refresh genre_count so that the view is up-to-date.
+===============
+Creating and refreshing a materialized view
+The syntax for creating materialized and non-materialized views are quite similar because they are both defined by a query. One key difference is that we can refresh materialized views, while no such concept exists for non-materialized views. It's important to know how to refresh a materialized view, otherwise the view will remain a snapshot of the time the view was created.
+
+In this exercise, you will create a materialized view from the table genres. A new record will then be inserted into genres. To make sure the view has the latest data, it will have to be refreshed.
+----------
+INSTRUCTIONS
+Create a materialized view called genre_count that holds the number of reviews for each genre.
+Refresh genre_count so that the view is up-to-date.
+-- Create a materialized view called genre_count
+CREATE MATERIALIZED VIEW genre_count AS
+SELECT genre, COUNT(*)
+FROM genres
+GROUP BY genre;
+
+INSERT INTO genres
+VALUES (50000, 'classical');
+
+-- Refresh genre_count
+REFRESH MATERIALIZED VIEW genre_count;
+
+SELECT * FROM genre_count;
+=================
+Exercise
+Create a role
+A database role is an entity that contains information that define the role's privileges and interact with the client authentication system. Roles allow you to give different people (and often groups of people) that interact with your data different levels of access.
+
+Imagine you founded a startup. You are about to hire a group of data scientists. You also hired someone named Marta who needs to be able to login to your database. You're also about to hire a database administrator. In this exercise, you will create these roles.
+INSTRUCTIONS
+
+Create a role called data_scientist.
+
+Create a role called marta that has one attribute: the ability to login (LOGIN).
+
+Create a role called admin with the ability to create databases (CREATEDB) and to create roles (CREATEROLE).
+CREATE ROLE data_scientist;
+
+-- Create a role for Marta
+CREATE ROLE marta WITH LOGIN
+
+-- Create an admin role
+CREATE ROLE admin WITH CREATEDB CREATEROLE;
+=========
+Exercise
+GRANT privileges and ALTER attributes
+Once roles are created, you grant them specific access control privileges on objects, like tables and views. Common privileges being SELECT, INSERT, UPDATE, etc.
+
+Imagine you're a cofounder of that startup and you want all of your data scientists to be able to update and insert data in the long_reviews view. In this exercise, you will enable those soon-to-be-hired data scientists by granting their role (data_scientist) those privileges. Also, you'll give Marta's role a password.
+-----------
+Instructions
+
+Grant the data_scientist role update and insert privileges on the long_reviews view.
+Alter Marta's role to give her the provided password.
+-- Grant data_scientist update and insert privileges
+GRANT UPDATE, INSERT  ON long_reviews TO data_scientist;
+
+-- Give Marta's role a password
+ALTER ROLE marta WITH PASSWORD 's3cur3p@ssw0rd';
+
+----------
+Exercise
+Add a user role to a group role
+There are two types of roles: user roles and group roles. By assigning a user role to a group role, a database administrator can add complicated levels of access to their databases with one simple command.
+
+For your startup, your search for data scientist hires is taking longer than expected. Fortunately, it turns out that Marta, your recent hire, has previous data science experience and she's willing to chip in the interim. In this exercise, you'll add Marta's user role to the data scientist group role. You'll then remove her after you complete your hiring process.
+
+Instructions
+Add Marta's user role to the data scientist group role.
+Celebrate! You hired multiple data scientists.
+Remove Marta's user role from the data scientist group role.
+
+-- Add Marta to the data scientist group
+GRANT data_scientist TO marta;
+
+-- Celebrate! You hired data scientists.
+
+-- Remove Marta from the data scientist group
+REVOKE data_scientist FROM marta;
+![alt text](<Partitioning & Normalization.png>)
+-----------------------------
+Exercise
+Creating vertical partitions
+In the video, you learned about vertical partitioning and saw an example.
+
+For vertical partitioning, there is no specific syntax in PostgreSQL. You have to create a new table with particular columns and copy the data there. Afterward, you can drop the columns you want in the separate partition. If you need to access the full table, you can do so by using a JOIN clause.
+
+In this exercise and the next one, you'll be working with the example database called pagila. It's a database that is often used to showcase PostgreSQL features. The database contains several tables. We'll be working with the film table. In this exercise, we'll use the following columns:
+
+film_id: the unique identifier of the film
+long_description: a lengthy description of the film
+-------
+INSTRUCTIONS
+Create a new table film_descriptions containing 2 fields: film_id, which is of type INT, and long_description, which is of type TEXT.
+Occupy the new table with values from the film table.
+-- Create a new table called film_descriptions
+CREATE TABLE film_descriptions (
+    film_id INT,
+    long_description TEXT
+);
+
+-- Copy the descriptions from the film table
+INSERT INTO film_descriptions
+SELECT film_id, long_description FROM film;
+
+--Drop the field long_description from the film table.
+--Join the two resulting tables to view the original table.
+-- Create a new table called film_descriptions
+CREATE TABLE film_descriptions (
+    film_id INT,
+    long_description TEXT
+);
+
+-- Copy the descriptions from the film table
+INSERT INTO film_descriptions
+SELECT film_id, long_description FROM film;
+
+-- Drop the descriptions from the original table
+ALTER TABLE film DROP COLUMN long_description;
+
+-- Join to view the original table
+SELECT * FROM film_descriptions
+JOIN film USING(film_id);
+----------------
+Exercise
+Creating horizontal partitions
+In the video, you also learned about horizontal partitioning.
+
+The example of horizontal partitioning showed the syntax necessary to create horizontal partitions in PostgreSQL. If you need a reminder, you can have a look at the slides.
+
+In this exercise, however, you'll be using a list partition instead of a range partition. For list partitions, you form partitions by checking whether the partition key is in a list of values or not.
+
+To do this, we partition by LIST instead of RANGE. When creating the partitions, you should check if the values are IN a list of values.
+
+We'll be using the following columns in this exercise:
+
+film_id: the unique identifier of the film
+title: the title of the film
+release_year: the year it's released
+--INSTRUCTIONS
+--Create the table film_partitioned, partitioned on the field release_year.
+-- Create a new table called film_partitioned
+CREATE TABLE film_partitioned (
+  film_id INT,
+  title TEXT NOT NULL,
+  release_year TEXT
+)
+PARTITION BY RANGE (release_year);
+---
+--Create three partitions: one for each release year: 2017, 2018, and 2019. Call the partition for 2019 film_2019, etc.
+-- Create a new table called film_partitioned
+CREATE TABLE film_partitioned (
+  film_id INT,
+  title TEXT NOT NULL,
+  release_year TEXT
+)
+PARTITION BY LIST (release_year);
+
+-- Create the partitions for 2019, 2018, and 2017
+CREATE TABLE film_2019
+	PARTITION OF film_partitioned FOR VALUES IN ('2019');
+
+CREATE TABLE film_2018
+	PARTITION OF film_partitioned FOR VALUES IN ('2018');
+
+CREATE TABLE film_2017
+	PARTITION OF film_partitioned FOR VALUES IN ('2017');
+
+--Occupy the new table, film_partitioned, with the three fields required from the film table.
+-- Insert the data into film_partitioned
+INSERT INTO film_partitioned
+SELECT film_id, title,release_year FROM film;
+
+-- View film_partitioned
+SELECT * FROM film_partitioned;
+![alt text](<DATA Integrations Dos& DONTS.png>)
+![alt text](<Chosing the RIGHT DBMS.png>)
+![alt text](<DW VS DL.png>)
+
