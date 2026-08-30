@@ -574,4 +574,3 @@ SELECT * FROM film_partitioned;
 ![alt text](<DATA Integrations Dos& DONTS.png>)
 ![alt text](<Chosing the RIGHT DBMS.png>)
 ![alt text](<DW VS DL.png>)
-
